@@ -97,22 +97,47 @@ export async function POST(request: NextRequest) {
       message: error?.message,
       code: error?.code,
       stack: error?.stack,
+      name: error?.name,
     });
     
-    // Provide more helpful error messages
+    // Check for specific database errors
     let errorMessage = 'Interne serverfout';
+    let errorCode = error?.code;
+    
     if (error?.code === 'P2025') {
       errorMessage = 'Gebruiker niet gevonden';
+    } else if (error?.code === 'P2002') {
+      errorMessage = 'Database constraint violation';
+    } else if (error?.message?.includes('column') && error?.message?.includes('does not exist')) {
+      errorMessage = 'Database schema mismatch - column missing';
+      errorCode = 'SCHEMA_MISMATCH';
+    } else if (error?.message?.includes('Unknown argument')) {
+      errorMessage = 'Prisma client out of sync with database schema';
+      errorCode = 'PRISMA_MISMATCH';
+    } else if (error?.message?.includes('connect') || error?.message?.includes('connection')) {
+      errorMessage = 'Database connection failed';
+      errorCode = 'CONNECTION_ERROR';
     } else if (error?.message?.includes('enum')) {
       errorMessage = 'Database schema fout. Neem contact op met de beheerder.';
     } else if (error?.message) {
-      errorMessage = `Fout: ${error.message}`;
+      errorMessage = error.message;
     }
     
     return NextResponse.json(
       { 
         error: errorMessage,
-        details: process.env.NODE_ENV === 'development' ? error?.message : undefined
+        code: errorCode,
+        details: process.env.NODE_ENV === 'development' ? {
+          message: error?.message,
+          code: error?.code,
+          stack: error?.stack?.split('\n').slice(0, 5),
+        } : undefined,
+        // Always include some diagnostic info in production
+        diagnostic: {
+          hasPrisma: !!prisma,
+          hasDatabaseUrl: !!process.env.DATABASE_URL,
+          databaseUrlFormat: process.env.DATABASE_URL?.substring(0, 20) + '...',
+        }
       },
       { status: 500 }
     );
