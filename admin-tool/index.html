@@ -1,0 +1,143 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://localhost:3000 https:;" />
+    <title>RI&E Admin Tool</title>
+    <style>
+      body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; background: #0f172a; color: #e5e7eb; }
+      header { padding: 16px 20px; background: #111827; border-bottom: 1px solid #374151; }
+      h1 { margin: 0; font-size: 18px; }
+      .container { padding: 16px 20px; display: grid; grid-template-columns: 320px 1fr; gap: 16px; }
+      .card { background: #111827; border: 1px solid #374151; border-radius: 10px; padding: 12px; }
+      .row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+      label { width: 110px; font-size: 12px; color: #9ca3af; }
+      input, select { flex: 1; padding: 8px; background: #0b1220; border: 1px solid #374151; color: #e5e7eb; border-radius: 8px; }
+      button { background: #fbbf24; color: #111827; border: none; padding: 10px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; }
+      button.secondary { background: transparent; color: #e5e7eb; border: 1px solid #374151; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { padding: 8px; border-bottom: 1px solid #1f2937; font-size: 13px; }
+      th { text-align: left; color: #9ca3af; }
+      .actions { display: flex; gap: 8px; }
+      .status-pill { padding: 2px 8px; border-radius: 999px; font-size: 12px; border: 1px solid #374151; }
+      .muted { color: #9ca3af; font-size: 12px; }
+      .error { color: #fecaca; }
+      .success { color: #bbf7d0; }
+      .field-error { color: #fecaca; font-size: 11px; margin-top: 4px; min-height: 16px; }
+      input:invalid, select:invalid { border-color: #fecaca; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>RI&E Admin Tool</h1>
+    </header>
+    <div class="container">
+      <div class="card">
+        <h3 style="margin:4px 0 12px 0; font-size:14px; color:#e5e7eb">Nieuwe gebruiker aanmaken</h3>
+        <div class="row">
+          <label>Naam *</label>
+          <div style="flex:1">
+            <input id="cName" placeholder="Jane Manager" />
+            <div id="cNameError" class="field-error"></div>
+          </div>
+        </div>
+        <div class="row">
+          <label>Email *</label>
+          <div style="flex:1">
+            <input id="cEmail" type="email" placeholder="jane@example.com" />
+            <div id="cEmailError" class="field-error"></div>
+          </div>
+        </div>
+        <div class="row">
+          <label>Wachtwoord *</label>
+          <div style="flex:1; position:relative">
+            <input id="cPassword" type="password" placeholder="Minimaal 8 tekens" style="padding-right:40px" />
+            <button type="button" id="togglePassword" style="position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none; color:#9ca3af; cursor:pointer; padding:4px; font-size:12px;">👁️</button>
+            <div id="cPasswordError" class="field-error"></div>
+          </div>
+        </div>
+        <div class="row">
+          <label>Rol</label>
+          <div style="flex:1">
+            <select id="cRole">
+              <option>MANAGER</option>
+              <option>EMPLOYEE</option>
+              <option>ADMIN</option>
+              <option>EXTERNAL_ADVISOR</option>
+            </select>
+            <div id="cRoleError" class="field-error"></div>
+          </div>
+        </div>
+        <div class="row">
+          <label>Bedrijfsnaam</label>
+          <div style="flex:1">
+            <input id="cCompanyName" placeholder="Optioneel" />
+            <div id="cCompanyNameError" class="field-error"></div>
+          </div>
+        </div>
+        <div class="muted" style="font-size:11px; margin-top:8px; margin-bottom:8px;">
+          ℹ️ Licentie kan later worden toegewezen via "Licentie toewijzen / bijwerken"
+        </div>
+        <div class="row actions">
+          <button type="button" id="createUser">Gebruiker aanmaken</button>
+        </div>
+        <div id="createStatus" class="muted"></div>
+        <hr style="border:0;border-top:1px solid #1f2937;margin:12px 0"/>
+        <div class="row"><label>Base URL</label><input id="baseUrl" placeholder="http://localhost:3000" /></div>
+        <div class="row"><label>Provision Token</label><input id="provToken" placeholder="PROVISION_TOKEN" /></div>
+        <div class="row"><button id="loadUsers">Laad gebruikers</button></div>
+        <div id="status" class="muted"></div>
+        <hr style="border:0;border-top:1px solid #1f2937;margin:12px 0"/>
+        <div class="row"><label>Geselecteerde gebruiker</label><input id="selectedUser" placeholder="Klik een rij in de tabel" readonly /></div>
+        <div class="row"><label>Plan</label>
+          <select id="plan">
+            <option value="SUPERUSER">SUPERUSER</option>
+            <option value="ADMIN">ADMIN</option>
+          </select>
+        </div>
+        <div class="row"><label>Status</label>
+          <select id="statusSel">
+            <option>ACTIVE</option>
+            <option>INACTIVE</option>
+            <option>EXPIRED</option>
+            <option>SUSPENDED</option>
+          </select>
+        </div>
+        <div class="row"><label>Verloopt op</label><input id="expiresAt" type="datetime-local" /></div>
+        <div class="row"><label>Account limiet</label><input id="accountLimit" type="number" min="1" placeholder="Alleen voor SUPERUSER" /></div>
+        <div class="muted" style="font-size:11px; margin-top:-4px; margin-bottom:8px;">
+          ℹ️ Account limiet alleen voor SUPERUSER plan. Laat leeg voor onbeperkt (ADMIN heeft altijd onbeperkt).
+        </div>
+        <div class="row actions">
+          <button id="assign">Licentie toewijzen / bijwerken</button>
+          <button id="clear" class="secondary">Leegmaken</button>
+        </div>
+        <div class="row actions" style="margin-top:8px">
+          <button id="impersonate" style="background:#10b981;">🔓 Inloggen als deze gebruiker</button>
+        </div>
+        <div id="opStatus" class="muted"></div>
+      </div>
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>Naam</th>
+              <th>Email</th>
+              <th>Rol</th>
+              <th>Bedrijf</th>
+              <th>Plan</th>
+              <th>Account Limiet</th>
+              <th>Status</th>
+              <th>Verloopt</th>
+            </tr>
+          </thead>
+          <tbody id="usersBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <script src="renderer/app.js"></script>
+  </body>
+  </html>
+
+

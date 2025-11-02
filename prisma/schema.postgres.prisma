@@ -1,0 +1,270 @@
+// Prisma schema for production (PostgreSQL on Vercel/Neon/Supabase)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  EMPLOYEE
+  EXTERNAL_ADVISOR
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum RiskCategory {
+  PHYSICAL_WORKSPACE
+  CHEMICAL_BIOLOGICAL
+  PSYCHOSOCIAL
+  PHYSICAL_STRAIN
+  SAFETY_RISKS
+  ENVIRONMENTAL
+}
+
+enum ActionStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  OVERDUE
+  CANCELLED
+}
+
+enum AssessmentStatus {
+  DRAFT
+  IN_PROGRESS
+  COMPLETED
+  APPROVED
+  ARCHIVED
+}
+
+enum CountermeasureType {
+  ELIMINATE
+  REDUCE
+  CONTROL
+}
+
+enum CountermeasurePriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model User {
+  id                  String   @id @default(cuid())
+  email               String   @unique
+  name                String
+  password            String
+  role                UserRole @default(EMPLOYEE)
+  companyId           String?
+  company             Company? @relation(fields: [companyId], references: [id])
+  assignedById        String?
+  assignedBy          User?    @relation("AccountAssignment", fields: [assignedById], references: [id])
+  assignedUsers       User[]   @relation("AccountAssignment")
+  onboardingCompleted Boolean  @default(false) // Track if user completed RI&E wizard
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  createdAssessments Assessment[]
+  assignedActions    Action[]
+  riskComments       RiskComment[]
+  assessmentApprovals AssessmentApproval[]
+  license            License?
+
+  @@map("users")
+}
+
+model Company {
+  id          String   @id @default(cuid())
+  name        String
+  address     String?
+  city        String?
+  postalCode  String?
+  country     String   @default("Netherlands")
+  phone       String?
+  email       String?
+  website     String?
+  kvkNumber   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users       User[]
+  assessments Assessment[]
+  risks       Risk[]
+  actions     Action[]
+
+  @@map("companies")
+}
+
+model Assessment {
+  id          String           @id @default(cuid())
+  companyId   String
+  company     Company          @relation(fields: [companyId], references: [id])
+  title       String
+  description String?
+  rieData     Json?
+  status      AssessmentStatus @default(DRAFT)
+  version     Int              @default(1)
+  assessorId  String
+  assessor    User             @relation(fields: [assessorId], references: [id])
+  startDate   DateTime
+  endDate     DateTime?
+  reviewDate  DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  risks       Risk[]
+  actions     Action[]
+  approvals   AssessmentApproval[]
+
+  @@map("assessments")
+}
+
+model Risk {
+  id                String       @id @default(cuid())
+  assessmentId      String
+  assessment        Assessment   @relation(fields: [assessmentId], references: [id])
+  companyId         String
+  company           Company      @relation(fields: [companyId], references: [id])
+  category          RiskCategory
+  title             String
+  description       String
+  location          String
+  department        String?
+  probability       Int
+  impact            Int
+  riskLevel         RiskLevel
+  exposedEmployees  Int          @default(0)
+  currentMeasures   Json?
+  proposedMeasures  Json?
+  status            String       @default("active")
+  createdDate       DateTime     @default(now())
+  reviewDate        DateTime?
+  attachments       Json?
+
+  countermeasures   Countermeasure[]
+  actions           Action[]
+  comments          RiskComment[]
+
+  @@map("risks")
+}
+
+model Countermeasure {
+  id          String                @id @default(cuid())
+  riskId      String
+  risk        Risk                  @relation(fields: [riskId], references: [id])
+  description String
+  type        CountermeasureType
+  priority    CountermeasurePriority
+  cost        Float?
+  timeline    Json?
+  responsible String?
+  effectiveness String?
+  status      ActionStatus          @default(PENDING)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  @@map("countermeasures")
+}
+
+model Action {
+  id            String       @id @default(cuid())
+  assessmentId  String?
+  assessment    Assessment?  @relation(fields: [assessmentId], references: [id])
+  riskId        String?
+  risk          Risk?        @relation(fields: [riskId], references: [id])
+  companyId     String
+  company       Company      @relation(fields: [companyId], references: [id])
+  title         String
+  description   String
+  priority      CountermeasurePriority
+  status        ActionStatus @default(PENDING)
+  assignedToId  String?
+  assignedTo    User?        @relation(fields: [assignedToId], references: [id])
+  dueDate       DateTime?
+  completedDate DateTime?
+  cost          Float?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@map("actions")
+}
+
+model RiskComment {
+  id        String   @id @default(cuid())
+  riskId    String
+  risk      Risk     @relation(fields: [riskId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  comment   String
+  createdAt DateTime @default(now())
+
+  @@map("risk_comments")
+}
+
+model RiskTemplate {
+  id          String       @id @default(cuid())
+  category    RiskCategory
+  title       String
+  description String
+  controls    String       // Recommended control measures (stored as text)
+  active      Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@unique([category, title])
+  @@map("risk_templates")
+  @@index([category])
+}
+
+model AssessmentApproval {
+  id           String     @id @default(cuid())
+  assessmentId String
+  assessment   Assessment @relation(fields: [assessmentId], references: [id])
+  approverId   String
+  approver     User       @relation(fields: [approverId], references: [id])
+  approved     Boolean
+  comment      String?
+  approvedAt   DateTime   @default(now())
+
+  @@map("assessment_approvals")
+}
+
+enum LicenseStatus {
+  ACTIVE
+  INACTIVE
+  EXPIRED
+  SUSPENDED
+}
+
+enum LicensePlan {
+  SUPERUSER
+  ADMIN
+}
+
+model License {
+  id              String        @id @default(cuid())
+  userId          String        @unique
+  user            User          @relation(fields: [userId], references: [id])
+  plan            LicensePlan
+  status          LicenseStatus @default(ACTIVE)
+  accountLimit    Int?
+  expiresAt       DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@map("licenses")
+}
+
+

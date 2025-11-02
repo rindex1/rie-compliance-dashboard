@@ -1,0 +1,49 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: rie-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: rie_user
+      POSTGRES_PASSWORD: rie_password
+      POSTGRES_DB: rie_compliance_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rie_user -d rie_compliance_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rie-dashboard
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://rie_user:rie_password@postgres:5432/rie_compliance_db
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-here-change-in-production}
+      JWT_EXPIRES_IN: 7d
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-your-nextauth-secret-here-change-in-production}
+      MAX_FILE_SIZE: "10485760"
+      UPLOAD_DIR: ./uploads
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - uploads_data:/app/uploads
+    command: sh -c "npx prisma migrate deploy && node server.js"
+
+volumes:
+  postgres_data:
+    driver: local
+  uploads_data:
+    driver: local

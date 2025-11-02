@@ -1,0 +1,31 @@
+{
+  "name": "rie-admin-tool",
+  "version": "0.1.0",
+  "private": true,
+  "main": "main.js",
+  "description": "Simple desktop tool to assign licenses for RI&E app",
+  "author": "RI&E Team",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --mac --dir",
+    "dist": "electron-builder --mac"
+  },
+  "build": {
+    "appId": "com.rie.admintool",
+    "productName": "RI&E Admin Tool",
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**",
+      "index.html"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity"
+    }
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "electron": "^30.0.0",
+    "electron-builder": "^24.13.3"
+  }
+}
